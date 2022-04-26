@@ -1,0 +1,4 @@
+module bzip2objc {
+    header "BZipCompression.h"
+    export *
+}
