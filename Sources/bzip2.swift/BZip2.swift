@@ -25,7 +25,7 @@ public class BZip2 {
             return Data()
         }
         var stream = bz_stream()
-        bzero(&stream, MemoryLayout.size(ofValue: stream))
+        bzero(&stream, MemoryLayout<bz_stream>.size)
         toCompressData.withUnsafeBytes { pointer in
             stream.next_in = UnsafeMutablePointer<CChar>(mutating: pointer.bindMemory(to: CChar.self).baseAddress!)
             stream.avail_in = UInt32(toCompressData.count)
@@ -71,7 +71,7 @@ public class BZip2 {
         }
         
         var stream = bz_stream()
-        bzero(&stream, MemoryLayout.size(ofValue: stream))
+        bzero(&stream, MemoryLayout<bz_stream>.size)
         toDecompressData.withUnsafeBytes { pointer in
             stream.next_in = UnsafeMutablePointer<CChar>(mutating: pointer.bindMemory(to: CChar.self).baseAddress!)
             stream.avail_in = UInt32(toDecompressData.count)
