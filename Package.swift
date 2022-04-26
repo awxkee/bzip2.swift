@@ -35,6 +35,7 @@ let package = Package(
         .testTarget(
             name: "bzip2.swiftTests",
             dependencies: ["bzip2.swift"],
-            path: "Tests"),
+            path: "Tests",
+            resources: [.process("bzip2.swiftTests/Test Files/XZ.txt")]),
     ]
 )
