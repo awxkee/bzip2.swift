@@ -91,7 +91,7 @@ extern NSInteger const BZipDefaultWorkFactor;
  @param progress A pointer to an `NSProgress` object that upon return will be set to an object reporting progress on the decompression operation.
  @param completion A block to execute upon completion of the decompression operation. The block has no return value and accepts two arguments: a Bpolean value that indicates if the operation was successful and an error describing the nature of the failure if the operation was not successful.
  */
-+ (void)decompressFileAtPath:(NSString *)sourcePath toFileAtPath:(NSString *)destinationPath progress:(NSProgress **)progress completion:(void (^)(BOOL success, NSError *error))completion;
++ (void*)decompressFileAtPath:(NSString *)sourcePath toFileAtPath:(NSString *)destinationPath progress:(NSProgress **)progress error:(NSError **)error;
 
 @end
 

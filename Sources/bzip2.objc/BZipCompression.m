@@ -8,7 +8,7 @@
 #import "BZipCompression.h"
 
 NSString * const BZipErrorDomain = @"com.radzivon.bartoshyk";
-static NSUInteger const BZipCompressionBufferSize = 1024;
+NSUInteger const BZipCompressionBufferSize = 1024;
 NSInteger const BZipDefaultBlockSize = 7;
 NSInteger const BZipDefaultWorkFactor = 0;
 
@@ -110,57 +110,38 @@ NSInteger const BZipDefaultWorkFactor = 0;
     return decompressedData;
 }
 
-+ (void)decompressFileAtPath:(NSString *)sourcePath toFileAtPath:(NSString *)destinationPath progress:(NSProgress **)progress completion:(void (^)(BOOL success, NSError *error))completion
++ (void* _Nullable)decompressFileAtPath:(NSString *)sourcePath toFileAtPath:(NSString *)destinationPath progress:(NSProgress **)progress error:(NSError **)error
 {
-    __block NSError *error = nil;
     BOOL isDirectory;
     if (![[NSFileManager defaultManager] fileExistsAtPath:sourcePath isDirectory:&isDirectory]) {
-        error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorInvalidSourcePath userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because the source path given does not exist.", nil) }];
-        if (completion) {
-            completion(NO, error);
-        }
+        *error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorInvalidSourcePath userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because the source path given does not exist.", nil) }];
         return;
     }
     if (isDirectory) {
-        error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorInvalidSourcePath userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because the source path given is a directory.", nil) }];
-        if (completion) {
-            completion(NO, error);
-        }
+        *error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorInvalidSourcePath userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because the source path given is a directory.", nil) }];
         return;
     }
     
     if ([[NSFileManager defaultManager] fileExistsAtPath:destinationPath isDirectory:&isDirectory]) {
-        error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorInvalidDestinationPath userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because the destination path given already exists.", nil) }];
-        if (completion) {
-            completion(NO, error);
-        }
+        *error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorInvalidDestinationPath userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because the destination path given already exists.", nil) }];
         return;
     }
     if (isDirectory) {
-        error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorInvalidDestinationPath userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because the destination path given is a directory.", nil) }];
-        if (completion) {
-            completion(NO, error);
-        }
+        *error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorInvalidDestinationPath userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because the destination path given is a directory.", nil) }];
         return;
     }
     
     NSError *attributesError = nil;
     NSDictionary *attributes = [[NSFileManager defaultManager] attributesOfItemAtPath:sourcePath error:&attributesError];
     if (!attributes) {
-        error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorFileManagementFailure userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because the size of the source path .", nil), NSUnderlyingErrorKey: attributesError }];
-        if (completion) {
-            completion(NO, error);
-        }
+        *error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorFileManagementFailure userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because the size of the source path .", nil), NSUnderlyingErrorKey: attributesError }];
         return;
     }
     unsigned long long sourceFileSize = [[attributes objectForKey:NSFileSize] unsignedLongLongValue];
     
     BOOL success = [[NSFileManager defaultManager] createFileAtPath:destinationPath contents:nil attributes:nil];
     if (!success) {
-        error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorUnableToCreateDestinationPath userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because the destination path could not be created.", nil) }];
-        if (completion) {
-            completion(NO, error);
-        }
+        *error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorUnableToCreateDestinationPath userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because the destination path could not be created.", nil) }];
         return;
     }
     
@@ -179,19 +160,13 @@ NSInteger const BZipDefaultWorkFactor = 0;
     bzero(&stream, sizeof(stream));
     NSFileHandle *inputFileHandle = [NSFileHandle fileHandleForReadingAtPath:sourcePath];
     if (!inputFileHandle) {
-        error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorInvalidSourcePath userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because a readable file handle for the source path could not be created.", nil) }];
-        if (completion) {
-            completion(NO, error);
-        }
+        *error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorInvalidSourcePath userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because a readable file handle for the source path could not be created.", nil) }];
         return;
     }
     
     NSFileHandle *outputFileHandle = [NSFileHandle fileHandleForWritingAtPath:destinationPath];
     if (!outputFileHandle) {
-        error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorInvalidDestinationPath userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because a writable file handle for the destination path could not be created.", nil) }];
-        if (completion) {
-            completion(NO, error);
-        }
+        *error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorInvalidDestinationPath userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because a writable file handle for the destination path could not be created.", nil) }];
         return;
     }
     
@@ -199,11 +174,12 @@ NSInteger const BZipDefaultWorkFactor = 0;
     int bzret = BZ_OK;
     bzret = BZ2_bzDecompressInit(&stream, 0, NO);
     if (bzret != BZ_OK) {
-        error = [NSError errorWithDomain:BZipErrorDomain code:bzret userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because `BZ2_bzDecompressInit` returned an error.", nil) }];
+        *error = [NSError errorWithDomain:BZipErrorDomain code:bzret userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because `BZ2_bzDecompressInit` returned an error.", nil) }];
+        return;
     } else {
         while (true) {
             if (decompressionProgress.isCancelled) {
-                error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorOperationCancelled userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because the operation was cancelled.", nil) }];
+                *error = [NSError errorWithDomain:BZipErrorDomain code:BZipErrorOperationCancelled userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because the operation was cancelled.", nil) }];
                 break;
             }
             NSData *inputChunk = [inputFileHandle readDataOfLength:BZipCompressionBufferSize];
@@ -225,7 +201,7 @@ NSInteger const BZipDefaultWorkFactor = 0;
                 
                 bzret = BZ2_bzDecompress(&stream);
                 if (bzret < BZ_OK) {
-                    error = [NSError errorWithDomain:BZipErrorDomain code:bzret userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because `BZ2_bzDecompress` returned an error.", nil) }];
+                    *error = [NSError errorWithDomain:BZipErrorDomain code:bzret userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Decompression failed because `BZ2_bzDecompress` returned an error.", nil) }];
                     break;
                 }
                 NSData *decompressedData = [NSMutableData dataWithBytes:[decompressedDataBuffer bytes] length:(BZipCompressionBufferSize - stream.avail_out)];
@@ -255,9 +231,6 @@ NSInteger const BZipDefaultWorkFactor = 0;
     
     if (error) {
         [[NSFileManager defaultManager] removeItemAtPath:destinationPath error:nil];
-    }
-    if (completion) {
-        completion(error == nil, error);
     }
 }
 

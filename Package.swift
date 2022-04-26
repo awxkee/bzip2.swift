@@ -34,6 +34,7 @@ let package = Package(
                 ]),
         .testTarget(
             name: "bzip2.swiftTests",
-            dependencies: ["bzip2.swift"]),
+            dependencies: ["bzip2.swift"],
+            path: "Tests"),
     ]
 )
