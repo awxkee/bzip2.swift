@@ -9,7 +9,7 @@ let package = Package(
         // Products define the executables and libraries a package produces, and make them visible to other packages.
         .library(
             name: "bzip2.swift",
-            targets: ["bzip2.swift"]),
+            targets: ["bzip2.swift", "bzip2.objc"]),
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -39,5 +39,7 @@ let package = Package(
             dependencies: ["bzip2.swift"],
             path: "Tests",
             resources: [.process("bzip2.swiftTests/Test Files/XZ.txt")]),
-    ]
+    ],
+    swiftLanguageVersions: [.v5],
+    cLanguageStandard: .c11
 )
