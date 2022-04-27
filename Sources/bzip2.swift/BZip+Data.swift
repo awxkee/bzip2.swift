@@ -6,7 +6,9 @@
 //
 
 import Foundation
+#if SWIFT_PACKAGE
 import bzip2objc
+#endif
 
 public extension Data {
     

@@ -20,7 +20,7 @@ let package = Package(
         // Targets can depend on other targets in this package, and on products in packages this package depends on.
         .target(
             name: "bzip2.swift",
-            dependencies: ["bzip2.objc"],
+            dependencies: [.target(name: "bzip2.objc")],
             path: "Sources/bzip2.swift"),
         .target(name: "bzip2.objc",
                 dependencies: [],
@@ -28,6 +28,7 @@ let package = Package(
                 publicHeadersPath: "include",
                 cSettings: [
                     .headerSearchPath("."),
+                    .headerSearchPath("include")
                 ],
                 linkerSettings: [
                     .linkedLibrary("bz2")
