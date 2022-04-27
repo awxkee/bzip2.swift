@@ -28,7 +28,8 @@ let package = Package(
                 publicHeadersPath: "include",
                 cSettings: [
                     .headerSearchPath("."),
-                    .headerSearchPath("include")
+                    .headerSearchPath("include"),
+                    .define("BZIP_DECLARE_EXPORT")
                 ],
                 linkerSettings: [
                     .linkedLibrary("bz2")
