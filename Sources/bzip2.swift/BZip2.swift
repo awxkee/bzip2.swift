@@ -15,7 +15,7 @@ public typealias BZip2ProgressHandler = (Int64) -> Void
 
 public class BZip2 {
     
-    public static let BZipCompressionBufferSize: Int = 1024 * 10
+    public static let BZipCompressionBufferSize: UInt32 = 1024 * 50
     public static let BZipDefaultBlockSize: UInt = 7
     public static let BZipWorkFactor: Int32 = 0
 
@@ -84,18 +84,19 @@ public class BZip2 {
                                   progressHandler: BZip2ProgressHandler? = nil) throws {
         var stream = bz_stream()
         bzero(&stream, MemoryLayout<bz_stream>.size)
-        guard let srcBuffer = malloc(BZipCompressionBufferSize) else {
-            throw BZip2OutOfMemoryError(requiredSize: BZipCompressionBufferSize)
+        guard let srcBuffer = malloc(Int(BZipCompressionBufferSize)) else {
+            throw BZip2OutOfMemoryError(requiredSize: Int(BZipCompressionBufferSize))
         }
-        guard let dstBuffer = malloc(BZipCompressionBufferSize) else {
-            throw BZip2OutOfMemoryError(requiredSize: BZipCompressionBufferSize)
+        let destinationBufferSize: Int = Int(BZipCompressionBufferSize)
+        guard let dstBuffer = malloc(destinationBufferSize) else {
+            throw BZip2OutOfMemoryError(requiredSize: Int(destinationBufferSize))
         }
         src.open()
         dst.open()
-        var readData = BZipCompressionBufferSize
-        stream.next_in = srcBuffer.assumingMemoryBound(to: CChar.self)
-        stream.next_out = dstBuffer.assumingMemoryBound(to: CChar.self)
-        stream.avail_out = UInt32(BZipCompressionBufferSize)
+        var readData = Int(BZipCompressionBufferSize)
+        stream.next_in = srcBuffer.bindMemory(to: CChar.self, capacity: Int(BZipCompressionBufferSize))
+        stream.next_out = dstBuffer.bindMemory(to: CChar.self, capacity: destinationBufferSize)
+        stream.avail_out = UInt32(destinationBufferSize)
         var status = BZ2_bzDecompressInit(&stream, 0, 0)
         guard status == BZ_OK else {
             var errnum: Int32 = status
@@ -106,8 +107,8 @@ public class BZip2 {
         }
         var compressedSize: Int64 = 0
         var lastReportedSize: Int64 = 0
-        while readData == BZipCompressionBufferSize {
-            readData = src.read(srcBuffer, maxLength: BZipCompressionBufferSize)
+        while readData == Int(BZipCompressionBufferSize) {
+            readData = src.read(srcBuffer.assumingMemoryBound(to: UInt8.self), maxLength: Int(BZipCompressionBufferSize))
             compressedSize += Int64(readData)
             if readData == -1 {
                 free(srcBuffer)
@@ -118,15 +119,30 @@ public class BZip2 {
                 throw BZip2InvalidInputStreamError()
             }
             stream.avail_in = UInt32(readData)
-            status = BZ2_bzDecompress(&stream)
-            if status < BZ_OK {
-                var errnum: Int32 = status
-                if let string = BZ2_bzerror(&stream, &errnum), let swiftString = String(utf8String: string) {
-                    throw BZip2UnderlyingError(code: status, message: swiftString)
+            stream.next_in = srcBuffer.bindMemory(to: CChar.self, capacity: Int(BZipCompressionBufferSize))
+            while status != BZ_STREAM_END {
+                stream.next_out = dstBuffer.bindMemory(to: CChar.self, capacity: destinationBufferSize)
+                stream.avail_out = UInt32(destinationBufferSize)
+                status = BZ2_bzDecompress(&stream)
+                if status < BZ_OK {
+                    var errnum: Int32 = status
+                    free(srcBuffer)
+                    free(dstBuffer)
+                    src.close()
+                    dst.close()
+                    BZ2_bzDecompressEnd(&stream)
+                    if let string = BZ2_bzerror(&stream, &errnum), let swiftString = String(utf8String: string) {
+                        throw BZip2UnderlyingError(code: status, message: swiftString)
+                    }
+                    throw BZip2CompressionError(code: status)
                 }
-                throw BZip2CompressionError(code: status)
+                if destinationBufferSize - Int(stream.avail_out) > 0 {
+                    dst.write(dstBuffer, maxLength: destinationBufferSize - Int(stream.avail_out))
+                }
+                if destinationBufferSize - Int(stream.avail_out) == 0 {
+                    break
+                }
             }
-            dst.write(dstBuffer, maxLength: BZip2.BZipCompressionBufferSize - Int(stream.avail_out))
             if let progressHandler, compressedSize - lastReportedSize >= minimumReportingBlock {
                 lastReportedSize = compressedSize
                 progressHandler(compressedSize)
@@ -145,15 +161,15 @@ public class BZip2 {
                                 progressHandler: BZip2ProgressHandler? = nil) throws {
         var stream = bz_stream()
         bzero(&stream, MemoryLayout<bz_stream>.size)
-        guard let srcBuffer = malloc(BZipCompressionBufferSize) else {
-            throw BZip2OutOfMemoryError(requiredSize: BZipCompressionBufferSize)
+        guard let srcBuffer = malloc(Int(BZipCompressionBufferSize)) else {
+            throw BZip2OutOfMemoryError(requiredSize: Int(BZipCompressionBufferSize))
         }
-        guard let dstBuffer = malloc(BZipCompressionBufferSize) else {
-            throw BZip2OutOfMemoryError(requiredSize: BZipCompressionBufferSize)
+        guard let dstBuffer = malloc(Int(BZipCompressionBufferSize)) else {
+            throw BZip2OutOfMemoryError(requiredSize: Int(BZipCompressionBufferSize))
         }
         src.open()
         dst.open()
-        var readData = BZipCompressionBufferSize
+        var readData: Int = Int(BZipCompressionBufferSize)
         stream.next_in = srcBuffer.assumingMemoryBound(to: CChar.self)
         stream.next_out = dstBuffer.assumingMemoryBound(to: CChar.self)
         stream.avail_out = UInt32(BZipCompressionBufferSize)
@@ -168,7 +184,7 @@ public class BZip2 {
         var compressedSize: Int64 = 0
         var lastReportedSize: Int64 = 0
         while readData == BZipCompressionBufferSize {
-            readData = src.read(srcBuffer, maxLength: BZipCompressionBufferSize)
+            readData = src.read(srcBuffer, maxLength: Int(BZipCompressionBufferSize))
             compressedSize += Int64(readData)
             if readData == -1 {
                 free(srcBuffer)
@@ -178,17 +194,32 @@ public class BZip2 {
                 BZ2_bzCompressEnd(&stream)
                 throw BZip2InvalidInputStreamError()
             }
+            stream.next_in = srcBuffer.assumingMemoryBound(to: CChar.self)
             stream.avail_in = UInt32(readData)
-            status = BZ2_bzCompress(&stream, readData == BZipCompressionBufferSize ? BZ_RUN : BZ_FINISH)
-            if status < BZ_OK {
-                var errnum: Int32 = status
-                if let string = BZ2_bzerror(&stream, &errnum), let swiftString = String(utf8String: string) {
-                    throw BZip2UnderlyingError(code: status, message: swiftString)
+            while status != BZ_STREAM_END {
+                stream.next_out = dstBuffer.assumingMemoryBound(to: CChar.self)
+                stream.avail_out = UInt32(BZipCompressionBufferSize)
+                status = BZ2_bzCompress(&stream, (stream.avail_in != 0) ? BZ_RUN : BZ_FINISH)
+                if status < BZ_OK {
+                    var errnum: Int32 = status
+                    free(srcBuffer)
+                    free(dstBuffer)
+                    src.close()
+                    dst.close()
+                    BZ2_bzCompressEnd(&stream)
+                    if let string = BZ2_bzerror(&stream, &errnum), let swiftString = String(utf8String: string) {
+                        throw BZip2UnderlyingError(code: status, message: swiftString)
+                    }
+                    throw BZip2CompressionError(code: status)
                 }
-                throw BZip2CompressionError(code: status)
+                let length = Int(BZip2.BZipCompressionBufferSize) - Int(stream.avail_out)
+                if length > 0 {
+                    dst.write(dstBuffer, maxLength: length)
+                }
+                if length == 0 {
+                    break
+                }
             }
-            let length = BZip2.BZipCompressionBufferSize - Int(stream.avail_out)
-            dst.write(dstBuffer, maxLength: length)
             if let progressHandler, compressedSize - lastReportedSize >= minimumReportingBlock {
                 lastReportedSize = compressedSize
                 progressHandler(compressedSize)
@@ -217,7 +248,7 @@ public class BZip2 {
             stream.next_in = UnsafeMutablePointer<CChar>(mutating: pointer.bindMemory(to: CChar.self).baseAddress!)
             stream.avail_in = UInt32(toCompressData.count)
         }
-        var buffer = Data(capacity: BZip2.BZipCompressionBufferSize)
+        var buffer = Data(capacity: Int(BZip2.BZipCompressionBufferSize))
         buffer.withUnsafeMutableBytes { pointer in
             stream.next_out = UnsafeMutablePointer<CChar>(mutating: pointer.bindMemory(to: CChar.self).baseAddress!)
             stream.avail_out = UInt32(BZip2.BZipCompressionBufferSize)
@@ -242,7 +273,10 @@ public class BZip2 {
                 throw BZip2CompressionError(code: status)
             }
             buffer.withUnsafeBytes { pointer in
-                compressedData.append(UnsafePointer<UInt8>(pointer.bindMemory(to: UInt8.self).baseAddress!), count: BZip2.BZipCompressionBufferSize - Int(stream.avail_out))
+                if Int(BZip2.BZipCompressionBufferSize) - Int(stream.avail_out) > 0 {
+                    compressedData.append(UnsafePointer<UInt8>(pointer.bindMemory(to: UInt8.self).baseAddress!),
+                                          count: Int(BZip2.BZipCompressionBufferSize) - Int(stream.avail_out))
+                }
             }
 
             buffer.withUnsafeMutableBytes { pointer in
@@ -271,7 +305,7 @@ public class BZip2 {
             stream.next_in = UnsafeMutablePointer<CChar>(mutating: pointer.bindMemory(to: CChar.self).baseAddress!)
             stream.avail_in = UInt32(toDecompressData.count)
         }
-        var buffer = Data(capacity: BZip2.BZipCompressionBufferSize)
+        var buffer = Data(capacity: Int(BZip2.BZipCompressionBufferSize))
         buffer.withUnsafeMutableBytes { pointer in
             stream.next_out = UnsafeMutablePointer<CChar>(mutating: pointer.bindMemory(to: CChar.self).baseAddress!)
             stream.avail_out = UInt32(BZip2.BZipCompressionBufferSize)
@@ -296,8 +330,10 @@ public class BZip2 {
                 throw BZip2DecompressionError(code: status)
             }
             buffer.withUnsafeBytes { pointer in
-                let length = BZip2.BZipCompressionBufferSize - Int(stream.avail_out)
-                decompressedData.append(UnsafePointer<UInt8>.init(pointer.bindMemory(to: UInt8.self).baseAddress!), count: length)
+                let length = Int(BZip2.BZipCompressionBufferSize) - Int(stream.avail_out)
+                if length > 0 {
+                    decompressedData.append(UnsafePointer<UInt8>.init(pointer.bindMemory(to: UInt8.self).baseAddress!), count: length)
+                }
             }
             buffer.withUnsafeMutableBytes { pointer in
                 stream.next_out = UnsafeMutablePointer<CChar>(mutating: pointer.bindMemory(to: CChar.self).baseAddress!)
