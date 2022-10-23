@@ -111,12 +111,7 @@ public class BZip2 {
             readData = src.read(srcBuffer.assumingMemoryBound(to: UInt8.self), maxLength: Int(BZipCompressionBufferSize))
             compressedSize += Int64(readData)
             if readData == -1 {
-                free(srcBuffer)
-                free(dstBuffer)
-                src.close()
-                dst.close()
-                BZ2_bzDecompressEnd(&stream)
-                throw BZip2InvalidInputStreamError()
+                break
             }
             stream.avail_in = UInt32(readData)
             stream.next_in = srcBuffer.bindMemory(to: CChar.self, capacity: Int(BZipCompressionBufferSize))
@@ -187,12 +182,7 @@ public class BZip2 {
             readData = src.read(srcBuffer, maxLength: Int(BZipCompressionBufferSize))
             compressedSize += Int64(readData)
             if readData == -1 {
-                free(srcBuffer)
-                free(dstBuffer)
-                src.close()
-                dst.close()
-                BZ2_bzCompressEnd(&stream)
-                throw BZip2InvalidInputStreamError()
+                break
             }
             stream.next_in = srcBuffer.assumingMemoryBound(to: CChar.self)
             stream.avail_in = UInt32(readData)
